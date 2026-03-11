@@ -96,16 +96,16 @@ class MainWindow(QMainWindow):
         header_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
         # Логотип
-        logo_path = Path(__file__).parent.parent.parent / "data" / "logo.jpg"
+        logo_path = Path(__file__).parent.parent.parent / "data" / "logo.png"
         if logo_path.exists():
             logo_label = QLabel()
             pixmap = QPixmap(str(logo_path)).scaled(
-                60, 60,
+                100, 100,
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation
             )
             logo_label.setPixmap(pixmap)
-            logo_label.setFixedSize(60, 60)
+            logo_label.setFixedSize(100, 100)
             header_layout.addWidget(logo_label)
         
         # Название
