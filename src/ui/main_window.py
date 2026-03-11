@@ -92,8 +92,12 @@ class MainWindow(QMainWindow):
         main_layout.setContentsMargins(15, 15, 15, 15)
 
         # Заголовок с логотипом
-        header_layout = QHBoxLayout()
+        header_widget = QWidget()
+        header_widget.setObjectName("header")
+        header_widget.setMaximumHeight(120)
+        header_layout = QHBoxLayout(header_widget)
         header_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        header_layout.setContentsMargins(15, 10, 15, 10)
         
         # Логотип
         logo_path = Path(__file__).parent.parent.parent / "data" / "logo.png"
@@ -114,7 +118,7 @@ class MainWindow(QMainWindow):
         title.setAlignment(Qt.AlignmentFlag.AlignVCenter)
         header_layout.addWidget(title)
         
-        main_layout.addLayout(header_layout)
+        main_layout.addWidget(header_widget)
         
         # Разделитель
         splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -262,13 +266,17 @@ class MainWindow(QMainWindow):
             }
             
             /* Заголовок */
+            QWidget#header {
+                background-color: #16213e;
+                border-bottom: 2px solid #0f3460;
+                border-radius: 0px;
+            }
+            
             QLabel#title {
-                color: #eee;
-                font-size: 28px;
+                color: #e94560;
+                font-size: 22px;
                 font-weight: bold;
                 padding: 10px 15px;
-                background-color: #16213e;
-                border-radius: 8px;
             }
             
             /* Кнопки */
