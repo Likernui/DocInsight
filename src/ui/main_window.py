@@ -25,7 +25,7 @@ from PyQt6.QtWidgets import (
     QSplitter,
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QFont, QPixmap
 
 from src.text_extractor import DocumentLoader
 from src.preprocessor import DocumentProcessor
@@ -90,12 +90,31 @@ class MainWindow(QMainWindow):
         main_layout = QVBoxLayout(central_widget)
         main_layout.setSpacing(10)
         main_layout.setContentsMargins(15, 15, 15, 15)
+
+        # Заголовок с логотипом
+        header_layout = QHBoxLayout()
+        header_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
-        # Заголовок
-        title = QLabel("📚 DocInsight")
+        # Логотип
+        logo_path = Path(__file__).parent.parent.parent / "data" / "logo.jpg"
+        if logo_path.exists():
+            logo_label = QLabel()
+            pixmap = QPixmap(str(logo_path)).scaled(
+                60, 60,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation
+            )
+            logo_label.setPixmap(pixmap)
+            logo_label.setFixedSize(60, 60)
+            header_layout.addWidget(logo_label)
+        
+        # Название
+        title = QLabel("DocInsight")
         title.setObjectName("title")
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        main_layout.addWidget(title)
+        title.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+        header_layout.addWidget(title)
+        
+        main_layout.addLayout(header_layout)
         
         # Разделитель
         splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -245,9 +264,9 @@ class MainWindow(QMainWindow):
             /* Заголовок */
             QLabel#title {
                 color: #eee;
-                font-size: 24px;
+                font-size: 28px;
                 font-weight: bold;
-                padding: 10px;
+                padding: 10px 15px;
                 background-color: #16213e;
                 border-radius: 8px;
             }
