@@ -367,11 +367,18 @@ class MainWindow(QMainWindow):
             self.progress.setVisible(False)
             self.statusBar().showMessage("Текст извлечён!")
             
+            # Считаем общую статистику
+            total_chars = sum(len(t) for t in results.values())
+            total_chars_no_spaces = sum(len(t.replace(' ', '').replace('\n', '')) for t in results.values())
+            total_words = sum(len(t.split()) for t in results.values())
+            
             # Показываем первый файл
             if results:
                 first_file = list(results.keys())[0]
                 self._show_source_text(first_file, results[first_file])
-                self._log(f"Извлечено текста: {sum(len(t) for t in results.values())} символов")
+                self._log(f"Извлечено текста: {total_chars} символов")
+                self._log(f"Без пробелов: {total_chars_no_spaces} символов")
+                self._log(f"Количество слов: {total_words}")
         
         def on_error(error):
             self._log(f"Ошибка: {error}")
@@ -428,22 +435,40 @@ class MainWindow(QMainWindow):
             self.txt_chunks.setText("Нет чанков")
             return
         
-        chunks_text = ""
+        # Статистика
+        stats_html = f'''
+        <div style="background-color: #0f3460; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+            <div style="color: #e94560; font-size: 18px; font-weight: bold;">📊 Статистика чанков</div>
+            <div style="color: #eee; margin-top: 10px;">
+                Всего чанков: <span style="color: #e94560; font-weight: bold;">{len(self.all_chunks)}</span><br>
+                Средний размер: <span style="color: #e94560; font-weight: bold;">{sum(len(c.text) for c in self.all_chunks) // len(self.all_chunks)}</span> символов
+            </div>
+        </div>
+        '''
+        
+        chunks_html = ""
         colors = ["#e94560", "#0f3460", "#533483", "#16213e"]
         
         for i, chunk in enumerate(self.all_chunks[:20]):  # Показываем первые 20
             color = colors[i % len(colors)]
-            chunks_text += f'<div style="background-color: #1a1a2e; border-left: 4px solid {color}; padding: 10px; margin: 10px 0; border-radius: 4px;">'
-            chunks_text += f'<span style="color: {color}; font-weight: bold;">Чанк {i+1}</span> '
-            chunks_text += f'<span style="color: #888;">(файл: {Path(chunk.source_file).name})</span><br>'
-            chunks_text += f'<span style="color: #666; font-size: 11px;">Позиция: {chunk.start_pos} - {chunk.end_pos}</span><br>'
-            chunks_text += f'<span style="color: #eee;">{chunk.text[:300]}...</span>'
-            chunks_text += '</div>'
+            chunks_html += f'''
+            <div style="background-color: #1a1a2e; border-left: 4px solid {color}; padding: 10px; margin: 10px 0; border-radius: 4px;">
+                <div style="color: {color}; font-weight: bold; margin-bottom: 5px;">
+                    Чанк {i+1} | Файл: {Path(chunk.source_file).name}
+                </div>
+                <div style="color: #888; font-size: 11px; margin-bottom: 8px;">
+                    Позиция: {chunk.start_pos} - {chunk.end_pos} | Размер: {len(chunk.text)} символов
+                </div>
+                <div style="color: #eee; line-height: 1.5;">
+                    {chunk.text[:300]}...
+                </div>
+            </div>
+            '''
         
         if len(self.all_chunks) > 20:
-            chunks_text += f'<div style="color: #888; text-align: center; padding: 20px;">... и ещё {len(self.all_chunks) - 20} чанков</div>'
+            chunks_html += f'<div style="color: #888; text-align: center; padding: 20px;">... и ещё {len(self.all_chunks) - 20} чанков</div>'
         
-        self.txt_chunks.setHtml(chunks_text)
+        self.txt_chunks.setHtml(stats_html + chunks_html)
     
     def _clear_all(self):
         """Очистить все данные"""

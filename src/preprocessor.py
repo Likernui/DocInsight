@@ -194,9 +194,11 @@ class TextChunker:
                 chunk_index += 1
                 
                 # Оставляем перекрытие для следующего чанка
+                # Важно: сохраняем позицию начала overlap для следующего чанка
+                overlap_start = current_start + len(current_chunk) - self.overlap
                 overlap_text = current_chunk[-self.overlap:] if len(current_chunk) > self.overlap else ""
                 current_chunk = overlap_text
-                current_start = current_start + len(current_chunk) - len(overlap_text)
+                current_start = overlap_start
         
         # Сохраняем последний чанк
         if current_chunk.strip():
