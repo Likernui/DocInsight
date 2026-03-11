@@ -397,15 +397,15 @@ class MainWindow(QMainWindow):
     
     def _show_source_text(self, file_path: str, text: str):
         """Показать исходный текст"""
-        preview = text[:5000] + "..." if len(text) > 5000 else text
+        # Показываем ВЕСЬ текст (без ограничений)
         
         html_text = f'''
         <div style="background-color: #1a1a2e; padding: 15px; border-radius: 8px;">
             <div style="color: #e94560; font-size: 16px; font-weight: bold; margin-bottom: 10px;">
                 📄 {Path(file_path).name}
             </div>
-            <div style="color: #eee; line-height: 1.6; white-space: pre-wrap;">
-                {preview}
+            <div style="color: #eee; line-height: 1.6; white-space: pre-wrap; font-size: 11px;">
+                {text}
             </div>
         </div>
         '''

@@ -34,12 +34,12 @@ class DocxExtractor(TextExtractor):
             doc = Document(file_path)
             texts = []
             
-            # Извлекаем текст из параграфов
+            # Текст из параграфов
             for para in doc.paragraphs:
                 if para.text.strip():
                     texts.append(para.text)
             
-            # Извлекаем текст из таблиц (важно для отчётов!)
+            # Текст из таблиц
             for table in doc.tables:
                 for row in table.rows:
                     for cell in row.cells:
@@ -47,6 +47,7 @@ class DocxExtractor(TextExtractor):
                             texts.append(cell.text)
             
             return "\n".join(texts)
+            
         except Exception as e:
             raise RuntimeError(f"Ошибка чтения DOCX файла {file_path}: {e}")
 
@@ -133,10 +134,10 @@ class DocumentLoader:
     def load(self, file_path: str) -> str:
         """
         Загрузить текст из файла
-        
+
         Args:
             file_path: Путь к файлу
-            
+
         Returns:
             Извлечённый текст
         """
