@@ -87,7 +87,8 @@ class MainWindow(QMainWindow):
         
         # Заголовок
         title = QLabel("📚 DocInsight")
-        title.setFont(QFont("Arial", 18, QFont.Weight.Bold))
+        title.setObjectName("title")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         main_layout.addWidget(title)
         
         # Разделитель
@@ -101,18 +102,20 @@ class MainWindow(QMainWindow):
         
         # Кнопка загрузки
         self.btn_load = QPushButton("📁 Выбрать файлы")
-        self.btn_load.setFixedHeight(40)
+        self.btn_load.setFixedHeight(50)
+        self.btn_load.setStyleSheet("font-size: 15px;")
         self.btn_load.clicked.connect(self._load_files)
         left_layout.addWidget(self.btn_load)
         
         # Счётчик файлов
         self.lbl_file_count = QLabel("Загружено файлов: 0")
-        self.lbl_file_count.setFont(QFont("Arial", 10))
+        self.lbl_file_count.setObjectName("file_count")
+        self.lbl_file_count.setFont(QFont("Arial", 11))
         left_layout.addWidget(self.lbl_file_count)
         
         # Список файлов
         self.file_list = QListWidget()
-        self.file_list.setAlternatingRowColors(True)
+        self.file_list.setAlternatingRowColors(False)
         left_layout.addWidget(self.file_list)
         
         # Прогресс бар
@@ -122,13 +125,16 @@ class MainWindow(QMainWindow):
         
         # Кнопки тестирования
         btn_layout = QHBoxLayout()
+        btn_layout.setSpacing(10)
         
         self.btn_extract = QPushButton("🔍 Извлечь текст")
+        self.btn_extract.setFixedHeight(45)
         self.btn_extract.clicked.connect(self._extract_text)
         self.btn_extract.setEnabled(False)
         btn_layout.addWidget(self.btn_extract)
         
         self.btn_process = QPushButton("⚙️ Обработать")
+        self.btn_process.setFixedHeight(45)
         self.btn_process.clicked.connect(self._process_documents)
         self.btn_process.setEnabled(False)
         btn_layout.addWidget(self.btn_process)
@@ -165,6 +171,8 @@ class MainWindow(QMainWindow):
         
         # Кнопка очистки
         self.btn_clear = QPushButton("🗑️ Очистить")
+        self.btn_clear.setFixedHeight(40)
+        self.btn_clear.setStyleSheet("background-color: #c73e54;")
         self.btn_clear.clicked.connect(self._clear_all)
         right_layout.addWidget(self.btn_clear)
         
@@ -181,46 +189,124 @@ class MainWindow(QMainWindow):
         """Настройка стилей (CSS)"""
         self.setStyleSheet("""
             QMainWindow {
-                background-color: #f5f5f5;
+                background-color: #1a1a2e;
             }
+            
+            /* Заголовок */
+            QLabel#title {
+                color: #eee;
+                font-size: 24px;
+                font-weight: bold;
+                padding: 10px;
+                background-color: #16213e;
+                border-radius: 8px;
+            }
+            
+            /* Кнопки */
             QPushButton {
-                background-color: #4CAF50;
+                background-color: #0f3460;
                 color: white;
                 border: none;
-                border-radius: 4px;
-                padding: 8px 16px;
-                font-size: 13px;
+                border-radius: 6px;
+                padding: 10px 20px;
+                font-size: 14px;
+                font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #45a049;
+                background-color: #e94560;
+            }
+            QPushButton:pressed {
+                background-color: #c73e54;
             }
             QPushButton:disabled {
-                background-color: #cccccc;
+                background-color: #2a2a4a;
+                color: #666;
             }
+            
+            /* Список файлов */
             QListWidget {
-                background-color: white;
-                border: 1px solid #ddd;
-                border-radius: 4px;
-                padding: 5px;
+                background-color: #16213e;
+                color: #eee;
+                border: 2px solid #0f3460;
+                border-radius: 8px;
+                padding: 8px;
+                font-size: 13px;
             }
+            QListWidget::item {
+                padding: 8px;
+                border-radius: 4px;
+            }
+            QListWidget::item:selected {
+                background-color: #0f3460;
+            }
+            QListWidget::item:hover {
+                background-color: #1a3a5c;
+            }
+            
+            /* Текстовые поля */
             QTextEdit {
-                background-color: white;
-                border: 1px solid #ddd;
-                border-radius: 4px;
-                padding: 5px;
+                background-color: #16213e;
+                color: #eee;
+                border: 2px solid #0f3460;
+                border-radius: 8px;
+                padding: 10px;
+                font-size: 12px;
+                line-height: 1.5;
             }
+            QTextEdit:focus {
+                border: 2px solid #e94560;
+            }
+            
+            /* Прогресс бар */
             QProgressBar {
-                border: 1px solid #ddd;
-                border-radius: 4px;
+                background-color: #16213e;
+                border: none;
+                border-radius: 8px;
                 text-align: center;
+                color: #eee;
+                font-weight: bold;
+                height: 20px;
             }
             QProgressBar::chunk {
-                background-color: #4CAF50;
+                background-color: #e94560;
+                border-radius: 8px;
             }
+            
+            /* Вкладки */
             QTabWidget::pane {
-                border: 1px solid #ddd;
-                border-radius: 4px;
-                background-color: white;
+                border: 2px solid #0f3460;
+                border-radius: 8px;
+                background-color: #16213e;
+            }
+            QTabBar::tab {
+                background-color: #1a1a2e;
+                color: #888;
+                padding: 10px 20px;
+                margin-right: 2px;
+                border-top-left-radius: 6px;
+                border-top-right-radius: 6px;
+                font-weight: bold;
+            }
+            QTabBar::tab:selected {
+                background-color: #16213e;
+                color: #e94560;
+            }
+            QTabBar::tab:hover {
+                color: #eee;
+            }
+            
+            /* Счётчик */
+            QLabel#file_count {
+                color: #888;
+                font-size: 12px;
+                padding: 5px;
+            }
+            
+            /* Статус бар */
+            QStatusBar {
+                background-color: #16213e;
+                color: #888;
+                border-top: 1px solid #0f3460;
             }
         """)
     
@@ -305,7 +391,18 @@ class MainWindow(QMainWindow):
     def _show_source_text(self, file_path: str, text: str):
         """Показать исходный текст"""
         preview = text[:5000] + "..." if len(text) > 5000 else text
-        self.txt_source.setText(f"Файл: {Path(file_path).name}\n\n{preview}")
+        
+        html_text = f'''
+        <div style="background-color: #1a1a2e; padding: 15px; border-radius: 8px;">
+            <div style="color: #e94560; font-size: 16px; font-weight: bold; margin-bottom: 10px;">
+                📄 {Path(file_path).name}
+            </div>
+            <div style="color: #eee; line-height: 1.6; white-space: pre-wrap;">
+                {preview}
+            </div>
+        </div>
+        '''
+        self.txt_source.setHtml(html_text)
     
     def _process_documents(self):
         """Обработать документы (очистка + чанки)"""
@@ -332,15 +429,21 @@ class MainWindow(QMainWindow):
             return
         
         chunks_text = ""
+        colors = ["#e94560", "#0f3460", "#533483", "#16213e"]
+        
         for i, chunk in enumerate(self.all_chunks[:20]):  # Показываем первые 20
-            chunks_text += f"=== Чанк {i+1} (файл: {Path(chunk.source_file).name}) ===\n"
-            chunks_text += f"Позиция: {chunk.start_pos} - {chunk.end_pos}\n"
-            chunks_text += f"{chunk.text[:300]}...\n\n"
+            color = colors[i % len(colors)]
+            chunks_text += f'<div style="background-color: #1a1a2e; border-left: 4px solid {color}; padding: 10px; margin: 10px 0; border-radius: 4px;">'
+            chunks_text += f'<span style="color: {color}; font-weight: bold;">Чанк {i+1}</span> '
+            chunks_text += f'<span style="color: #888;">(файл: {Path(chunk.source_file).name})</span><br>'
+            chunks_text += f'<span style="color: #666; font-size: 11px;">Позиция: {chunk.start_pos} - {chunk.end_pos}</span><br>'
+            chunks_text += f'<span style="color: #eee;">{chunk.text[:300]}...</span>'
+            chunks_text += '</div>'
         
         if len(self.all_chunks) > 20:
-            chunks_text += f"\n... и ещё {len(self.all_chunks) - 20} чанков"
+            chunks_text += f'<div style="color: #888; text-align: center; padding: 20px;">... и ещё {len(self.all_chunks) - 20} чанков</div>'
         
-        self.txt_chunks.setText(chunks_text)
+        self.txt_chunks.setHtml(chunks_text)
     
     def _clear_all(self):
         """Очистить все данные"""
@@ -364,7 +467,7 @@ class MainWindow(QMainWindow):
         """Добавить сообщение в лог"""
         from datetime import datetime
         timestamp = datetime.now().strftime("%H:%M:%S")
-        self.txt_log.append(f"[{timestamp}] {message}")
+        self.txt_log.append(f'<span style="color: #e94560;">[{timestamp}]</span> <span style="color: #eee;">{message}</span>')
         self.txt_log.verticalScrollBar().setValue(
             self.txt_log.verticalScrollBar().maximum()
         )
