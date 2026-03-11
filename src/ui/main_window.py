@@ -95,6 +95,7 @@ class MainWindow(QMainWindow):
         header_widget = QWidget()
         header_widget.setObjectName("header")
         header_widget.setMaximumHeight(220)
+        header_widget.setMaximumWidth(600)  # Ограничиваем ширину
         header_layout = QHBoxLayout(header_widget)
         header_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header_layout.setContentsMargins(15, 10, 15, 10)
