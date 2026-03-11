@@ -32,8 +32,21 @@ class DocxExtractor(TextExtractor):
         
         try:
             doc = Document(file_path)
-            paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
-            return "\n".join(paragraphs)
+            texts = []
+            
+            # Извлекаем текст из параграфов
+            for para in doc.paragraphs:
+                if para.text.strip():
+                    texts.append(para.text)
+            
+            # Извлекаем текст из таблиц (важно для отчётов!)
+            for table in doc.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        if cell.text.strip():
+                            texts.append(cell.text)
+            
+            return "\n".join(texts)
         except Exception as e:
             raise RuntimeError(f"Ошибка чтения DOCX файла {file_path}: {e}")
 
