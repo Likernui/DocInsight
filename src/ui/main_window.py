@@ -101,16 +101,22 @@ class MainWindow(QMainWindow):
         
         # Логотип
         logo_path = Path(__file__).parent.parent.parent / "data" / "logo.png"
+        print(f"Logo path: {logo_path}, exists: {logo_path.exists()}")
         if logo_path.exists():
             logo_label = QLabel()
-            pixmap = QPixmap(str(logo_path)).scaled(
+            pixmap = QPixmap(str(logo_path))
+            print(f"Pixmap valid: {not pixmap.isNull()}, size: {pixmap.size()}")
+            pixmap = pixmap.scaled(
                 100, 100,
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation
             )
             logo_label.setPixmap(pixmap)
             logo_label.setFixedSize(100, 100)
+            logo_label.setStyleSheet("background-color: #16213e;")
             header_layout.addWidget(logo_label)
+        else:
+            print(f"Logo not found at {logo_path}")
         
         # Название
         title = QLabel("DocInsight")
@@ -267,7 +273,7 @@ class MainWindow(QMainWindow):
             
             /* Заголовок */
             QWidget#header {
-                background-color: #16213e;
+                background-color: #2d3561;
                 border-bottom: 2px solid #0f3460;
                 border-radius: 0px;
             }
