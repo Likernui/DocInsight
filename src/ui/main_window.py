@@ -162,25 +162,25 @@ class MainWindow(QMainWindow):
         # Вкладка 1: Исходный текст
         self.txt_source = QTextEdit()
         self.txt_source.setReadOnly(True)
-        self.txt_source.setFont(QFont("Consolas", 10))
+        self.txt_source.setFont(QFont("Menlo", 10))  # Menlo — аналог Consolas для macOS
         self.tabs.addTab(self.txt_source, "📄 Исходный текст")
         
         # Вкладка 2: Чанки
         self.txt_chunks = QTextEdit()
         self.txt_chunks.setReadOnly(True)
-        self.txt_chunks.setFont(QFont("Consolas", 9))
+        self.txt_chunks.setFont(QFont("Menlo", 9))
         self.tabs.addTab(self.txt_chunks, "🔹 Чанки")
         
         # Вкладка 3: Поиск по индексу
         self.txt_search = QTextEdit()
         self.txt_search.setReadOnly(True)
-        self.txt_search.setFont(QFont("Consolas", 9))
+        self.txt_search.setFont(QFont("Menlo", 9))
         self.tabs.addTab(self.txt_search, "🔍 Поиск")
         
         # Вкладка 4: Лог
         self.txt_log = QTextEdit()
         self.txt_log.setReadOnly(True)
-        self.txt_log.setFont(QFont("Consolas", 9))
+        self.txt_log.setFont(QFont("Menlo", 9))
         self.tabs.addTab(self.txt_log, "📋 Лог")
         
         right_layout.addWidget(self.tabs)

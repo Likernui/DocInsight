@@ -44,8 +44,8 @@ class DocumentIndexer:
         indexer.save("index.faiss")
     """
     
-    # Модель для создания эмбеддингов (русская + английская)
-    MODEL_NAME = "cointegrated/LaBSE-en-ru"
+    # Модель для создания эмбеддингов (русская + английская, поменьше)
+    MODEL_NAME = "paraphrase-multilingual-MiniLM-L12-v2"
     
     def __init__(self, model_name: str = None):
         """
@@ -154,13 +154,16 @@ class DocumentIndexer:
             normalize_embeddings=True
         ).astype('float32')
         
+        # Ограничиваем top_k количеством чанков в индексе
+        actual_top_k = min(top_k, len(self.chunks))
+        
         # Ищем в индексе
-        scores, indices = self.index.search(query_embedding, top_k)
+        scores, indices = self.index.search(query_embedding, actual_top_k)
         
         # Возвращаем результаты
         results = []
         for score, idx in zip(scores[0], indices[0]):
-            if idx < len(self.chunks):
+            if idx >= 0 and idx < len(self.chunks):  # Проверяем валидность индекса
                 results.append((self.chunks[idx], float(score)))
         
         return results
