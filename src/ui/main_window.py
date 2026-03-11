@@ -113,7 +113,7 @@ class MainWindow(QMainWindow):
             )
             logo_label.setPixmap(pixmap)
             logo_label.setFixedSize(100, 100)
-            logo_label.setStyleSheet("background-color: #16213e;")
+            logo_label.setStyleSheet("background-color: transparent;")  # Прозрачный фон!
             header_layout.addWidget(logo_label)
         else:
             print(f"Logo not found at {logo_path}")
