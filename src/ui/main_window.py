@@ -1,0 +1,388 @@
+"""
+Главное окно приложения DocInsight
+Базовый интерфейс для тестирования модулей
+"""
+
+import sys
+from pathlib import Path
+from typing import Optional
+
+from PyQt6.QtWidgets import (
+    QApplication,
+    QMainWindow,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QPushButton,
+    QListWidget,
+    QListWidgetItem,
+    QTextEdit,
+    QFileDialog,
+    QLabel,
+    QProgressBar,
+    QTabWidget,
+    QMessageBox,
+    QSplitter,
+)
+from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PyQt6.QtGui import QFont
+
+from src.text_extractor import DocumentLoader
+from src.preprocessor import DocumentProcessor
+
+
+class WorkerThread(QThread):
+    """Поток для длительных операций (чтобы не блокировать UI)"""
+    
+    progress = pyqtSignal(int, int, str)  # current, total, filename
+    finished = pyqtSignal(object)  # результат
+    error = pyqtSignal(str)  # ошибка
+    
+    def __init__(self, operation, *args, **kwargs):
+        super().__init__()
+        self.operation = operation
+        self.args = args
+        self.kwargs = kwargs
+    
+    def run(self):
+        try:
+            result = self.operation(*self.args, **self.kwargs)
+            self.finished.emit(result)
+        except Exception as e:
+            self.error.emit(str(e))
+
+
+class MainWindow(QMainWindow):
+    """Главное окно приложения"""
+    
+    def __init__(self):
+        super().__init__()
+        
+        # Инициализация модулей
+        self.loader = DocumentLoader()
+        self.processor = DocumentProcessor(chunk_size=750, overlap=100)
+        
+        # Данные
+        self.file_paths: list[str] = []
+        self.extracted_texts: dict[str, str] = {}
+        self.all_chunks = []
+        
+        # Настройка окна
+        self._init_ui()
+        self._setup_styles()
+    
+    def _init_ui(self):
+        """Инициализация интерфейса"""
+        self.setWindowTitle("DocInsight - Система анализа документов")
+        self.setMinimumSize(1000, 700)
+        
+        # Центральный виджет
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        
+        # Основной layout
+        main_layout = QVBoxLayout(central_widget)
+        main_layout.setSpacing(10)
+        main_layout.setContentsMargins(15, 15, 15, 15)
+        
+        # Заголовок
+        title = QLabel("📚 DocInsight")
+        title.setFont(QFont("Arial", 18, QFont.Weight.Bold))
+        main_layout.addWidget(title)
+        
+        # Разделитель
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        main_layout.addWidget(splitter)
+        
+        # Левая панель - загрузка файлов
+        left_widget = QWidget()
+        left_layout = QVBoxLayout(left_widget)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Кнопка загрузки
+        self.btn_load = QPushButton("📁 Выбрать файлы")
+        self.btn_load.setFixedHeight(40)
+        self.btn_load.clicked.connect(self._load_files)
+        left_layout.addWidget(self.btn_load)
+        
+        # Счётчик файлов
+        self.lbl_file_count = QLabel("Загружено файлов: 0")
+        self.lbl_file_count.setFont(QFont("Arial", 10))
+        left_layout.addWidget(self.lbl_file_count)
+        
+        # Список файлов
+        self.file_list = QListWidget()
+        self.file_list.setAlternatingRowColors(True)
+        left_layout.addWidget(self.file_list)
+        
+        # Прогресс бар
+        self.progress = QProgressBar()
+        self.progress.setVisible(False)
+        left_layout.addWidget(self.progress)
+        
+        # Кнопки тестирования
+        btn_layout = QHBoxLayout()
+        
+        self.btn_extract = QPushButton("🔍 Извлечь текст")
+        self.btn_extract.clicked.connect(self._extract_text)
+        self.btn_extract.setEnabled(False)
+        btn_layout.addWidget(self.btn_extract)
+        
+        self.btn_process = QPushButton("⚙️ Обработать")
+        self.btn_process.clicked.connect(self._process_documents)
+        self.btn_process.setEnabled(False)
+        btn_layout.addWidget(self.btn_process)
+        
+        left_layout.addLayout(btn_layout)
+        
+        # Правая панель - результаты
+        right_widget = QWidget()
+        right_layout = QVBoxLayout(right_widget)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Вкладки
+        self.tabs = QTabWidget()
+        
+        # Вкладка 1: Исходный текст
+        self.txt_source = QTextEdit()
+        self.txt_source.setReadOnly(True)
+        self.txt_source.setFont(QFont("Consolas", 10))
+        self.tabs.addTab(self.txt_source, "📄 Исходный текст")
+        
+        # Вкладка 2: Чанки
+        self.txt_chunks = QTextEdit()
+        self.txt_chunks.setReadOnly(True)
+        self.txt_chunks.setFont(QFont("Consolas", 9))
+        self.tabs.addTab(self.txt_chunks, "🔹 Чанки")
+        
+        # Вкладка 3: Лог
+        self.txt_log = QTextEdit()
+        self.txt_log.setReadOnly(True)
+        self.txt_log.setFont(QFont("Consolas", 9))
+        self.tabs.addTab(self.txt_log, "📋 Лог")
+        
+        right_layout.addWidget(self.tabs)
+        
+        # Кнопка очистки
+        self.btn_clear = QPushButton("🗑️ Очистить")
+        self.btn_clear.clicked.connect(self._clear_all)
+        right_layout.addWidget(self.btn_clear)
+        
+        # Добавляем панели в splitter
+        splitter.addWidget(left_widget)
+        splitter.addWidget(right_widget)
+        splitter.setStretchFactor(0, 1)
+        splitter.setStretchFactor(1, 2)
+        
+        # Статус бар
+        self.statusBar().showMessage("Готов к работе")
+    
+    def _setup_styles(self):
+        """Настройка стилей (CSS)"""
+        self.setStyleSheet("""
+            QMainWindow {
+                background-color: #f5f5f5;
+            }
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 8px 16px;
+                font-size: 13px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+            QPushButton:disabled {
+                background-color: #cccccc;
+            }
+            QListWidget {
+                background-color: white;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                padding: 5px;
+            }
+            QTextEdit {
+                background-color: white;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                padding: 5px;
+            }
+            QProgressBar {
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                text-align: center;
+            }
+            QProgressBar::chunk {
+                background-color: #4CAF50;
+            }
+            QTabWidget::pane {
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                background-color: white;
+            }
+        """)
+    
+    def _load_files(self):
+        """Открыть диалог выбора файлов"""
+        files, _ = QFileDialog.getOpenFileNames(
+            self,
+            "Выберите файлы",
+            "",
+            "Все файлы (*);;DOCX (*.docx);;PDF (*.pdf);;Изображения (*.png *.jpg *.jpeg)"
+        )
+        
+        if files:
+            self.file_paths.extend(files)
+            self._update_file_list()
+            self._log(f"Добавлено файлов: {len(files)}")
+    
+    def _update_file_list(self):
+        """Обновить список файлов в UI"""
+        self.file_list.clear()
+        
+        for file_path in self.file_paths:
+            item = QListWidgetItem(Path(file_path).name)
+            item.setData(Qt.ItemDataRole.UserRole, file_path)
+            
+            # Статус обработки
+            if file_path in self.extracted_texts:
+                item.setText(f"✅ {Path(file_path).name}")
+            
+            self.file_list.addItem(item)
+        
+        self.lbl_file_count.setText(f"Загружено файлов: {len(self.file_paths)}")
+        self.btn_extract.setEnabled(len(self.file_paths) > 0)
+    
+    def _extract_text(self):
+        """Извлечь текст из выбранных файлов"""
+        if not self.file_paths:
+            QMessageBox.warning(self, "Внимание", "Сначала выберите файлы!")
+            return
+        
+        self._log(f"Начало извлечения текста из {len(self.file_paths)} файлов...")
+        self.progress.setVisible(True)
+        self.progress.setMaximum(len(self.file_paths))
+        self.progress.setValue(0)
+        self.btn_extract.setEnabled(False)
+        self.statusBar().showMessage("Извлечение текста...")
+        
+        # Запускаем в отдельном потоке
+        def progress_callback(current, total, filename):
+            self.progress.setValue(current)
+            self.statusBar().showMessage(f"Обработка: {Path(filename).name}")
+        
+        def on_finished(results):
+            self.extracted_texts = results
+            self._update_file_list()
+            self.btn_extract.setEnabled(True)
+            self.btn_process.setEnabled(True)
+            self.progress.setVisible(False)
+            self.statusBar().showMessage("Текст извлечён!")
+            
+            # Показываем первый файл
+            if results:
+                first_file = list(results.keys())[0]
+                self._show_source_text(first_file, results[first_file])
+                self._log(f"Извлечено текста: {sum(len(t) for t in results.values())} символов")
+        
+        def on_error(error):
+            self._log(f"Ошибка: {error}")
+            QMessageBox.critical(self, "Ошибка", f"Ошибка извлечения текста:\n{error}")
+            self.btn_extract.setEnabled(True)
+            self.progress.setVisible(False)
+        
+        self.worker = WorkerThread(
+            self.loader.load_multiple,
+            self.file_paths,
+            progress_callback=progress_callback
+        )
+        self.worker.finished.connect(on_finished)
+        self.worker.error.connect(on_error)
+        self.worker.start()
+    
+    def _show_source_text(self, file_path: str, text: str):
+        """Показать исходный текст"""
+        preview = text[:5000] + "..." if len(text) > 5000 else text
+        self.txt_source.setText(f"Файл: {Path(file_path).name}\n\n{preview}")
+    
+    def _process_documents(self):
+        """Обработать документы (очистка + чанки)"""
+        if not self.extracted_texts:
+            QMessageBox.warning(self, "Внимание", "Сначала извлеките текст!")
+            return
+        
+        self._log("Начало обработки документов...")
+        self.statusBar().showMessage("Обработка документов...")
+        
+        # Обрабатываем
+        self.all_chunks = self.processor.process_multiple(self.extracted_texts)
+        
+        self._log(f"Создано чанков: {len(self.all_chunks)}")
+        self.statusBar().showMessage(f"Готово! Чанков: {len(self.all_chunks)}")
+        
+        # Показываем чанки
+        self._show_chunks()
+    
+    def _show_chunks(self):
+        """Показать чанки в UI"""
+        if not self.all_chunks:
+            self.txt_chunks.setText("Нет чанков")
+            return
+        
+        chunks_text = ""
+        for i, chunk in enumerate(self.all_chunks[:20]):  # Показываем первые 20
+            chunks_text += f"=== Чанк {i+1} (файл: {Path(chunk.source_file).name}) ===\n"
+            chunks_text += f"Позиция: {chunk.start_pos} - {chunk.end_pos}\n"
+            chunks_text += f"{chunk.text[:300]}...\n\n"
+        
+        if len(self.all_chunks) > 20:
+            chunks_text += f"\n... и ещё {len(self.all_chunks) - 20} чанков"
+        
+        self.txt_chunks.setText(chunks_text)
+    
+    def _clear_all(self):
+        """Очистить все данные"""
+        self.file_paths = []
+        self.extracted_texts = {}
+        self.all_chunks = []
+        
+        self.file_list.clear()
+        self.txt_source.clear()
+        self.txt_chunks.clear()
+        self.lbl_file_count.setText("Загружено файлов: 0")
+        self.btn_extract.setEnabled(False)
+        self.btn_process.setEnabled(False)
+        self.progress.setVisible(False)
+        self.progress.setValue(0)
+        
+        self._log("Все данные очищены")
+        self.statusBar().showMessage("Готов к работе")
+    
+    def _log(self, message: str):
+        """Добавить сообщение в лог"""
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        self.txt_log.append(f"[{timestamp}] {message}")
+        self.txt_log.verticalScrollBar().setValue(
+            self.txt_log.verticalScrollBar().maximum()
+        )
+
+
+def main():
+    """Точка входа приложения"""
+    app = QApplication(sys.argv)
+    
+    # Настройка шрифта приложения
+    font = QFont("Arial", 10)
+    app.setFont(font)
+    
+    window = MainWindow()
+    window.show()
+    
+    sys.exit(app.exec())
+
+
+if __name__ == "__main__":
+    main()
