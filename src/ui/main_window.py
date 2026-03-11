@@ -30,6 +30,7 @@ from PyQt6.QtGui import QFont
 from src.text_extractor import DocumentLoader
 from src.preprocessor import DocumentProcessor
 from src.indexer import DocumentIndexer
+from src.entity_extractor import EntityExtractor
 
 
 class WorkerThread(QThread):
@@ -63,12 +64,14 @@ class MainWindow(QMainWindow):
         self.loader = DocumentLoader()
         self.processor = DocumentProcessor(chunk_size=750, overlap=100)
         self.indexer = DocumentIndexer()
+        self.entity_extractor = EntityExtractor(use_ner=False)  # NER отключена (медленная)
         
         # Данные
         self.file_paths: list[str] = []
         self.extracted_texts: dict[str, str] = {}
         self.all_chunks = []
         self.index_built = False
+        self.all_entities = []
         
         # Настройка окна
         self._init_ui()
@@ -151,6 +154,13 @@ class MainWindow(QMainWindow):
         self.btn_index.setEnabled(False)
         left_layout.addWidget(self.btn_index)
         
+        # Кнопка извлечения сущностей
+        self.btn_entities = QPushButton("🏷️ Извлечь сущности")
+        self.btn_entities.setFixedHeight(45)
+        self.btn_entities.clicked.connect(self._extract_entities)
+        self.btn_entities.setEnabled(False)
+        left_layout.addWidget(self.btn_entities)
+        
         # Правая панель - результаты
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
@@ -177,7 +187,13 @@ class MainWindow(QMainWindow):
         self.txt_search.setFont(QFont("Menlo", 9))
         self.tabs.addTab(self.txt_search, "🔍 Поиск")
         
-        # Вкладка 4: Лог
+        # Вкладка 4: Сущности
+        self.txt_entities = QTextEdit()
+        self.txt_entities.setReadOnly(True)
+        self.txt_entities.setFont(QFont("Menlo", 9))
+        self.tabs.addTab(self.txt_entities, "🏷️ Сущности")
+        
+        # Вкладка 5: Лог
         self.txt_log = QTextEdit()
         self.txt_log.setReadOnly(True)
         self.txt_log.setFont(QFont("Menlo", 9))
@@ -466,6 +482,7 @@ class MainWindow(QMainWindow):
         
         # Включаем кнопку построения индекса
         self.btn_index.setEnabled(True)
+        self.btn_entities.setEnabled(True)  # Включаем кнопку сущностей
     
     def _build_index(self):
         """Построить семантический индекс"""
@@ -507,6 +524,93 @@ class MainWindow(QMainWindow):
         indexer = DocumentIndexer()
         indexer.build_index(self.all_chunks)
         return indexer
+    
+    def _extract_entities(self):
+        """Извлечь сущности из чанков"""
+        if not self.all_chunks:
+            QMessageBox.warning(self, "Внимание", "Сначала обработайте документы!")
+            return
+        
+        self._log("Извлечение сущностей...")
+        self.statusBar().showMessage("Извлечение сущностей...")
+        
+        # Извлекаем сущности
+        self.all_entities = self.entity_extractor.extract_from_chunks(self.all_chunks)
+        
+        stats = self.entity_extractor.get_stats(self.all_entities)
+        self._log(f"Извлечено сущностей: {len(self.all_entities)}")
+        for type_name, count in stats.items():
+            self._log(f"  {type_name}: {count}")
+        
+        # Показываем сущности
+        self._show_entities()
+        
+        self.statusBar().showMessage(f"Готово! Найдено {len(self.all_entities)} сущностей")
+    
+    def _show_entities(self):
+        """Показать сущности в UI"""
+        if not self.all_entities:
+            self.txt_entities.setText("Сущности не найдены")
+            return
+        
+        # Группируем по типам
+        grouped = self.entity_extractor.group_by_type(self.all_entities)
+        stats = self.entity_extractor.get_stats(self.all_entities)
+        
+        # Статистика
+        stats_html = f'''
+        <div style="background-color: #0f3460; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+            <div style="color: #e94560; font-size: 18px; font-weight: bold;">🏷️ Статистика сущностей</div>
+            <div style="color: #eee; margin-top: 10px;">
+                Всего сущностей: <span style="color: #e94560; font-weight: bold;">{len(self.all_entities)}</span><br>
+        '''
+        
+        for type_name, count in stats.items():
+            stats_html += f'  {type_name}: <span style="color: #e94560; font-weight: bold;">{count}</span><br>'
+        
+        stats_html += '</div></div>'
+        
+        # Сущности по типам
+        entities_html = ""
+        type_colors = {
+            "ФИО": "#e94560",
+            "Технология": "#533483",
+            "Термин": "#0f3460",
+            "Дата": "#16a085",
+            "Email": "#e67e22",
+            "Телефон": "#27ae60",
+            "URL": "#2980b9",
+            "Организация": "#8e44ad",
+        }
+        
+        for entity_type, entities in grouped.items():
+            type_name = entity_type.value
+            color = type_colors.get(type_name, "#888888")
+            
+            entities_html += f'''
+            <div style="background-color: #1a1a2e; border-left: 4px solid {color}; padding: 12px; margin: 12px 0; border-radius: 4px;">
+                <div style="color: {color}; font-size: 16px; font-weight: bold; margin-bottom: 10px;">
+                    {type_name} ({len(entities)})
+                </div>
+            '''
+            
+            # Показываем первые 20 сущностей каждого типа
+            for i, entity in enumerate(entities[:20]):
+                entities_html += f'''
+                <div style="background-color: #16213e; padding: 8px; margin: 6px 0; border-radius: 4px;">
+                    <div style="color: #eee; font-size: 13px;">{entity.text}</div>
+                    <div style="color: #666; font-size: 10px;">
+                        {entity.source_file.split('/')[-1]} | Уверенность: {entity.confidence:.2f}
+                    </div>
+                </div>
+                '''
+            
+            if len(entities) > 20:
+                entities_html += f'<div style="color: #666; text-align: center; padding: 10px;">... и ещё {len(entities) - 20}</div>'
+            
+            entities_html += '</div>'
+        
+        self.txt_entities.setHtml(stats_html + entities_html)
     
     def _search(self):
         """Поиск по индексу"""
@@ -600,17 +704,22 @@ class MainWindow(QMainWindow):
         self.file_paths = []
         self.extracted_texts = {}
         self.all_chunks = []
+        self.all_entities = []
         self.index_built = False
         self.indexer = DocumentIndexer()
+        self.entity_extractor = EntityExtractor(use_ner=False)
         
         self.file_list.clear()
         self.txt_source.clear()
         self.txt_chunks.clear()
         self.txt_search.clear()
+        self.txt_entities.clear()
         self.lbl_file_count.setText("Загружено файлов: 0")
         self.btn_extract.setEnabled(False)
         self.btn_process.setEnabled(False)
         self.btn_index.setEnabled(False)
+        self.btn_entities.setEnabled(False)
+        self.btn_search.setEnabled(False)
         self.progress.setVisible(False)
         self.progress.setValue(0)
         
