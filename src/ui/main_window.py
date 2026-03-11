@@ -94,7 +94,7 @@ class MainWindow(QMainWindow):
         # Заголовок с логотипом
         header_widget = QWidget()
         header_widget.setObjectName("header")
-        header_widget.setMaximumHeight(220)
+        header_widget.setMaximumHeight(120)
         header_layout = QHBoxLayout(header_widget)
         header_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header_layout.setContentsMargins(15, 10, 15, 10)
@@ -107,12 +107,12 @@ class MainWindow(QMainWindow):
             pixmap = QPixmap(str(logo_path))
             print(f"Pixmap valid: {not pixmap.isNull()}, size: {pixmap.size()}")
             pixmap = pixmap.scaled(
-                200, 200,
+                100, 100,
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation
             )
             logo_label.setPixmap(pixmap)
-            logo_label.setFixedSize(200, 200)
+            logo_label.setFixedSize(100, 100)
             logo_label.setStyleSheet("background-color: transparent;")  # Прозрачный фон!
             header_layout.addWidget(logo_label)
         else:
