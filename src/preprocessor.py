@@ -87,130 +87,133 @@ class TextPreprocessor:
 class TextChunker:
     """
     Разбиение текста на фрагменты (чанки).
-    
-    Почему это важно:
-    - Семантический поиск работает по фрагментам
-    - Большие документы разбиваются на части по 500–1000 символов
-    - Каждый фрагмент будет иметь свой эмбеддинг
+    Разбивает ТОЛЬКО по границам предложений — никаких обрывов!
     """
-    
+
     def __init__(self, chunk_size: int = 750, overlap: int = 100):
         """
-        Инициализация чанкера.
-        
         Args:
-            chunk_size: Размер одного фрагмента в символах (по умолчанию 750)
-            overlap: Перекрытие между фрагментами в символах (по умолчанию 100)
-                     Нужно для сохранения контекста между соседними чанками
+            chunk_size: Целевой размер чанка (по умолчанию 750)
+            overlap: Перекрытие в символах (по умолчанию 100)
         """
         self.chunk_size = chunk_size
         self.overlap = overlap
     
     def chunk(self, text: str, source_file: str = "") -> List[TextChunk]:
-        """
-        Разбить текст на фрагменты.
-        
-        Алгоритм:
-        1. Разбиваем текст на предложения (по .!?;)
-        2. Собираем предложения в чанки нужного размера
-        3. Делаем перекрытие между чанками для сохранения контекста
-        
-        Args:
-            text: Текст для разбиения
-            source_file: Путь к исходному файлу (для метаданных)
-            
-        Returns:
-            Список фрагментов с метаданными
-        """
+        """Разбить текст на фрагменты ТОЛЬКО по границам предложений."""
         if not text.strip():
             return []
-        
+
         chunks = []
         chunk_index = 0
         
         # Разбиваем на предложения
         sentences = re.split(r'(?<=[.!?;])\s+', text)
+        sentences = [s.strip() for s in sentences if s.strip()]
         
-        current_chunk = ""
-        current_start = 0
-        sentence_positions = []  # Позиции начала предложений
+        if not sentences:
+            return []
         
+        # Вычисляем позиции предложений
+        sentence_positions = []
         pos = 0
-        for i, sentence in enumerate(sentences):
-            sentence_positions.append(pos)
-            pos += len(sentence) + 1  # +1 за пробел
+        for sentence in sentences:
+            start = text.find(sentence, pos)
+            sentence_positions.append(start)
+            pos = start + len(sentence)
+        
+        current_sentences = []
+        current_start = 0
         
         for i, sentence in enumerate(sentences):
-            # Если предложение очень длинное (больше chunk_size), разбиваем его
-            if len(sentence) > self.chunk_size:
-                # Если есть накопленный чанк — сохраняем его
-                if current_chunk.strip():
+            # Проверяем, влезет ли предложение в текущий чанк
+            test_chunk = " ".join(current_sentences + [sentence])
+            
+            if len(test_chunk) <= self.chunk_size:
+                # Влезает — добавляем
+                if not current_sentences:
+                    current_start = sentence_positions[i]
+                current_sentences.append(sentence)
+            else:
+                # Не влезает — сохраняем текущий чанк
+                if current_sentences:
+                    chunk_text = " ".join(current_sentences)
                     chunk = TextChunk(
-                        text=current_chunk.strip(),
+                        text=chunk_text,
                         source_file=source_file,
                         chunk_index=chunk_index,
                         start_pos=current_start,
-                        end_pos=current_start + len(current_chunk)
+                        end_pos=current_start + len(chunk_text)
                     )
                     chunks.append(chunk)
                     chunk_index += 1
-                
-                # Разбиваем длинное предложение на части
-                for j in range(0, len(sentence), self.chunk_size - self.overlap):
-                    part = sentence[j:j + self.chunk_size]
-                    start = sentence_positions[i] + j if i < len(sentence_positions) else 0
                     
-                    chunk = TextChunk(
-                        text=part.strip(),
-                        source_file=source_file,
-                        chunk_index=chunk_index,
-                        start_pos=start,
-                        end_pos=start + len(part)
-                    )
-                    chunks.append(chunk)
-                    chunk_index += 1
-                
-                current_chunk = ""
-                current_start = sentence_positions[i] + len(sentence) + 1 if i < len(sentence_positions) else 0
-                continue
-            
-            # Добавляем предложение к текущему чанку
-            if not current_chunk:
-                current_chunk = sentence
-                current_start = sentence_positions[i] if i < len(sentence_positions) else 0
-            else:
-                current_chunk += " " + sentence
-            
-            # Если чанк набрал нужный размер — сохраняем
-            if len(current_chunk) >= self.chunk_size:
-                chunk = TextChunk(
-                    text=current_chunk.strip(),
-                    source_file=source_file,
-                    chunk_index=chunk_index,
-                    start_pos=current_start,
-                    end_pos=current_start + len(current_chunk)
-                )
-                chunks.append(chunk)
-                chunk_index += 1
-                
-                # Оставляем перекрытие для следующего чанка
-                # Важно: сохраняем позицию начала overlap для следующего чанка
-                overlap_start = current_start + len(current_chunk) - self.overlap
-                overlap_text = current_chunk[-self.overlap:] if len(current_chunk) > self.overlap else ""
-                current_chunk = overlap_text
-                current_start = overlap_start
+                    # Определяем overlap — берём последние предложения, которые влезут в overlap
+                    overlap_sentences = []
+                    overlap_len = 0
+                    for s in reversed(current_sentences):
+                        if overlap_len + len(s) + 1 <= self.overlap:
+                            overlap_sentences.insert(0, s)
+                            overlap_len += len(s) + 1
+                        else:
+                            break
+                    
+                    # Начинаем новый чанк с overlap + текущее предложение
+                    current_sentences = overlap_sentences + [sentence] if overlap_sentences else [sentence]
+                    # Находим позицию начала первого предложения overlap
+                    if overlap_sentences:
+                        current_start = sentence_positions[i - len(overlap_sentences)]
+                    else:
+                        current_start = sentence_positions[i]
+                else:
+                    # Текущий чанк пустой (предложение больше chunk_size)
+                    # Разбиваем предложение по словам
+                    words = sentence.split()
+                    temp_chunk = []
+                    temp_start = sentence_positions[i]
+                    
+                    for word in words:
+                        if len(" ".join(temp_chunk + [word])) > self.chunk_size:
+                            if temp_chunk:
+                                chunk_text = " ".join(temp_chunk)
+                                chunk = TextChunk(
+                                    text=chunk_text,
+                                    source_file=source_file,
+                                    chunk_index=chunk_index,
+                                    start_pos=temp_start,
+                                    end_pos=temp_start + len(chunk_text)
+                                )
+                                chunks.append(chunk)
+                                chunk_index += 1
+                                temp_chunk = []
+                        temp_chunk.append(word)
+                    
+                    if temp_chunk:
+                        chunk_text = " ".join(temp_chunk)
+                        chunk = TextChunk(
+                            text=chunk_text,
+                            source_file=source_file,
+                            chunk_index=chunk_index,
+                            start_pos=temp_start,
+                            end_pos=temp_start + len(chunk_text)
+                        )
+                        chunks.append(chunk)
+                        chunk_index += 1
+                        current_sentences = []
+                        current_start = sentence_positions[i] + len(sentence)
         
         # Сохраняем последний чанк
-        if current_chunk.strip():
+        if current_sentences:
+            chunk_text = " ".join(current_sentences)
             chunk = TextChunk(
-                text=current_chunk.strip(),
+                text=chunk_text,
                 source_file=source_file,
                 chunk_index=chunk_index,
                 start_pos=current_start,
-                end_pos=current_start + len(current_chunk)
+                end_pos=current_start + len(chunk_text)
             )
             chunks.append(chunk)
-        
+
         return chunks
 
 

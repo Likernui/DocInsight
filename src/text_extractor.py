@@ -34,17 +34,49 @@ class DocxExtractor(TextExtractor):
             doc = Document(file_path)
             texts = []
             
-            # Текст из параграфов
+            # 1. Текст из параграфов основного содержимого
             for para in doc.paragraphs:
                 if para.text.strip():
                     texts.append(para.text)
             
-            # Текст из таблиц
+            # 2. Текст из таблиц
             for table in doc.tables:
                 for row in table.rows:
                     for cell in row.cells:
                         if cell.text.strip():
                             texts.append(cell.text)
+            
+            # 3. Текст из колонтитулов (header/footer)
+            for section in doc.sections:
+                # Header
+                try:
+                    header = section.header
+                    if header:
+                        for para in header.paragraphs:
+                            if para.text.strip():
+                                texts.append(f"[HEADER] {para.text}")
+                except:
+                    pass
+                
+                # Footer
+                try:
+                    footer = section.footer
+                    if footer:
+                        for para in footer.paragraphs:
+                            if para.text.strip():
+                                texts.append(f"[FOOTER] {para.text}")
+                except:
+                    pass
+            
+            # 4. Текст из сносок (footnotes)
+            try:
+                if doc.footnotes:
+                    for footnote in doc.footnotes:
+                        for para in footnote.paragraphs:
+                            if para.text.strip():
+                                texts.append(f"[FOOTNOTE] {para.text}")
+            except:
+                pass
             
             return "\n".join(texts)
             

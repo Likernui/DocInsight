@@ -449,24 +449,21 @@ class MainWindow(QMainWindow):
         chunks_html = ""
         colors = ["#e94560", "#0f3460", "#533483", "#16213e"]
         
-        for i, chunk in enumerate(self.all_chunks[:20]):  # Показываем первые 20
+        for i, chunk in enumerate(self.all_chunks):  # Показываем ВСЕ чанки
             color = colors[i % len(colors)]
             chunks_html += f'''
-            <div style="background-color: #1a1a2e; border-left: 4px solid {color}; padding: 10px; margin: 10px 0; border-radius: 4px;">
-                <div style="color: {color}; font-weight: bold; margin-bottom: 5px;">
+            <div style="background-color: #1a1a2e; border-left: 4px solid {color}; padding: 12px; margin: 12px 0; border-radius: 4px;">
+                <div style="color: {color}; font-size: 14px; font-weight: bold; margin-bottom: 8px;">
                     Чанк {i+1} | Файл: {Path(chunk.source_file).name}
                 </div>
-                <div style="color: #888; font-size: 11px; margin-bottom: 8px;">
+                <div style="color: #888; font-size: 11px; margin-bottom: 10px;">
                     Позиция: {chunk.start_pos} - {chunk.end_pos} | Размер: {len(chunk.text)} символов
                 </div>
-                <div style="color: #eee; line-height: 1.5;">
-                    {chunk.text[:300]}...
+                <div style="color: #eee; line-height: 1.6; white-space: pre-wrap; font-size: 12px;">
+                    {chunk.text}
                 </div>
             </div>
             '''
-        
-        if len(self.all_chunks) > 20:
-            chunks_html += f'<div style="color: #888; text-align: center; padding: 20px;">... и ещё {len(self.all_chunks) - 20} чанков</div>'
         
         self.txt_chunks.setHtml(stats_html + chunks_html)
     
