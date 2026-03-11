@@ -29,6 +29,7 @@ from PyQt6.QtGui import QFont
 
 from src.text_extractor import DocumentLoader
 from src.preprocessor import DocumentProcessor
+from src.indexer import DocumentIndexer
 
 
 class WorkerThread(QThread):
@@ -61,11 +62,13 @@ class MainWindow(QMainWindow):
         # Инициализация модулей
         self.loader = DocumentLoader()
         self.processor = DocumentProcessor(chunk_size=750, overlap=100)
+        self.indexer = DocumentIndexer()
         
         # Данные
         self.file_paths: list[str] = []
         self.extracted_texts: dict[str, str] = {}
         self.all_chunks = []
+        self.index_built = False
         
         # Настройка окна
         self._init_ui()
@@ -141,6 +144,13 @@ class MainWindow(QMainWindow):
         
         left_layout.addLayout(btn_layout)
         
+        # Кнопка построения индекса
+        self.btn_index = QPushButton("📚 Построить индекс")
+        self.btn_index.setFixedHeight(45)
+        self.btn_index.clicked.connect(self._build_index)
+        self.btn_index.setEnabled(False)
+        left_layout.addWidget(self.btn_index)
+        
         # Правая панель - результаты
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
@@ -161,7 +171,13 @@ class MainWindow(QMainWindow):
         self.txt_chunks.setFont(QFont("Consolas", 9))
         self.tabs.addTab(self.txt_chunks, "🔹 Чанки")
         
-        # Вкладка 3: Лог
+        # Вкладка 3: Поиск по индексу
+        self.txt_search = QTextEdit()
+        self.txt_search.setReadOnly(True)
+        self.txt_search.setFont(QFont("Consolas", 9))
+        self.tabs.addTab(self.txt_search, "🔍 Поиск")
+        
+        # Вкладка 4: Лог
         self.txt_log = QTextEdit()
         self.txt_log.setReadOnly(True)
         self.txt_log.setFont(QFont("Consolas", 9))
@@ -169,6 +185,24 @@ class MainWindow(QMainWindow):
         
         right_layout.addWidget(self.tabs)
         
+        # Поле поиска
+        search_layout = QHBoxLayout()
+        self.search_input = QTextEdit()
+        self.search_input.setReadOnly(False)
+        self.search_input.setPlaceholderText("Введите запрос для поиска...")
+        self.search_input.setMaximumHeight(60)
+        self.search_input.setFont(QFont("Arial", 11))
+        search_layout.addWidget(self.search_input)
+        
+        self.btn_search = QPushButton("🔍 Найти")
+        self.btn_search.setFixedHeight(60)
+        self.btn_search.setFixedWidth(100)
+        self.btn_search.clicked.connect(self._search)
+        self.btn_search.setEnabled(False)
+        search_layout.addWidget(self.btn_search)
+        
+        right_layout.addLayout(search_layout)
+
         # Кнопка очистки
         self.btn_clear = QPushButton("🗑️ Очистить")
         self.btn_clear.setFixedHeight(40)
@@ -425,9 +459,103 @@ class MainWindow(QMainWindow):
         
         self._log(f"Создано чанков: {len(self.all_chunks)}")
         self.statusBar().showMessage(f"Готово! Чанков: {len(self.all_chunks)}")
+        self.index_built = False  # Сбрасываем индекс
         
         # Показываем чанки
         self._show_chunks()
+        
+        # Включаем кнопку построения индекса
+        self.btn_index.setEnabled(True)
+    
+    def _build_index(self):
+        """Построить семантический индекс"""
+        if not self.all_chunks:
+            QMessageBox.warning(self, "Внимание", "Сначала обработайте документы!")
+            return
+        
+        self._log("Построение семантического индекса...")
+        self.statusBar().showMessage("Построение индекса...")
+        self.btn_index.setEnabled(False)
+        
+        # Запускаем в отдельном потоке
+        def on_finished(indexer):
+            self.indexer = indexer
+            self.index_built = True
+            self.btn_index.setEnabled(False)  # Отключаем кнопку индекса (уже построен)
+            self.btn_search.setEnabled(True)  # Включаем кнопку поиска
+            self.statusBar().showMessage("Индекс построен!")
+            
+            stats = indexer.get_stats()
+            self._log(f"Индекс построен: {stats['total_chunks']} чанков из {stats['total_files']} файлов")
+            
+            # Переключаемся на вкладку поиска
+            self.tabs.setCurrentWidget(self.txt_search)
+            self.txt_search.setText("Индекс готов! Введите запрос для поиска...")
+        
+        def on_error(error):
+            self._log(f"Ошибка построения индекса: {error}")
+            QMessageBox.critical(self, "Ошибка", f"Ошибка построения индекса:\n{error}")
+            self.btn_index.setEnabled(True)
+        
+        self.worker = WorkerThread(self._create_index)
+        self.worker.finished.connect(on_finished)
+        self.worker.error.connect(on_error)
+        self.worker.start()
+    
+    def _create_index(self):
+        """Создать индекс (вызывается в отдельном потоке)"""
+        indexer = DocumentIndexer()
+        indexer.build_index(self.all_chunks)
+        return indexer
+    
+    def _search(self):
+        """Поиск по индексу"""
+        query = self.search_input.toPlainText().strip()
+        
+        if not query:
+            QMessageBox.warning(self, "Внимание", "Введите запрос!")
+            return
+        
+        if not self.index_built:
+            QMessageBox.warning(self, "Внимание", "Сначала постройте индекс!")
+            return
+        
+        self._log(f"Поиск: {query}")
+        
+        try:
+            results = self.indexer.search(query, top_k=10)
+            
+            if not results:
+                self.txt_search.setText("Ничего не найдено.")
+                return
+            
+            # Формируем вывод
+            output = f'<div style="color: #888; margin-bottom: 15px;">Найдено {len(results)} результатов по запросу: "<span style="color: #e94560;">{query}</span>"</div>'
+            
+            for i, (chunk, score) in enumerate(results):
+                relevance = "высокая" if score > 0.7 else "средняя" if score > 0.5 else "низкая"
+                color = "#e94560" if score > 0.7 else "#533483" if score > 0.5 else "#0f3460"
+                
+                output += f'''
+                <div style="background-color: #1a1a2e; border-left: 4px solid {color}; padding: 12px; margin: 12px 0; border-radius: 4px;">
+                    <div style="color: {color}; font-size: 13px; font-weight: bold; margin-bottom: 8px;">
+                        Результат {i+1} | Релевантность: {relevance} ({score:.3f})
+                    </div>
+                    <div style="color: #888; font-size: 11px; margin-bottom: 8px;">
+                        Файл: {Path(chunk.source_file).name} | Позиция: {chunk.start_pos}-{chunk.end_pos}
+                    </div>
+                    <div style="color: #eee; line-height: 1.6; white-space: pre-wrap; font-size: 12px;">
+                        {chunk.text}
+                    </div>
+                </div>
+                '''
+            
+            self.txt_search.setHtml(output)
+            self._log(f"Найдено {len(results)} результатов")
+            
+        except Exception as e:
+            self._log(f"Ошибка поиска: {e}")
+            QMessageBox.critical(self, "Ошибка", f"Ошибка поиска:\n{e}")
     
     def _show_chunks(self):
         """Показать чанки в UI"""
@@ -472,13 +600,17 @@ class MainWindow(QMainWindow):
         self.file_paths = []
         self.extracted_texts = {}
         self.all_chunks = []
+        self.index_built = False
+        self.indexer = DocumentIndexer()
         
         self.file_list.clear()
         self.txt_source.clear()
         self.txt_chunks.clear()
+        self.txt_search.clear()
         self.lbl_file_count.setText("Загружено файлов: 0")
         self.btn_extract.setEnabled(False)
         self.btn_process.setEnabled(False)
+        self.btn_index.setEnabled(False)
         self.progress.setVisible(False)
         self.progress.setValue(0)
         
